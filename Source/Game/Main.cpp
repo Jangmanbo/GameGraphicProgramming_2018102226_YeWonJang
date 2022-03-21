@@ -37,6 +37,18 @@ INT WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     /*--------------------------------------------------------------------
       TODO: Initialization (remove the comment)
     --------------------------------------------------------------------*/
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
+
+    if (FAILED(library::InitWindow(hInstance, nCmdShow))) {
+        return 0;
+    }
+
+    if (FAILED(library::InitDevice()))
+    {
+        library::CleanupDevice();
+        return 0;
+    }
 
     // Main message loop
     MSG msg = { 0 };
@@ -44,6 +56,20 @@ INT WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, 
     /*--------------------------------------------------------------------
       TODO: Main message loop (remove the comment)
     --------------------------------------------------------------------*/
+    while (WM_QUIT != msg.message)
+    {
+        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            library::Render();  // Do some rendering
+        }
+    }
+
+    library::CleanupDevice();
 
     /*--------------------------------------------------------------------
       TODO: Destroy (remove the comment)
