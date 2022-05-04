@@ -4,18 +4,16 @@ namespace library
 {
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Renderer
-
       Summary:  Constructor
-
-      Modifies: [m_driverType, m_featureLevel, m_d3dDevice, m_d3dDevice1, 
-                  m_immediateContext, m_immediateContext1, m_swapChain, 
-                  m_swapChain1, m_renderTargetView].
+      Modifies: [m_driverType, m_featureLevel, m_d3dDevice, m_d3dDevice1,
+                  m_immediateContext, m_immediateContext1, m_swapChain,
+                  m_swapChain1, m_renderTargetView, m_vertexShader,
+                  m_pixelShader, m_vertexLayout, m_vertexBuffer].
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
     /*--------------------------------------------------------------------
       TODO: Renderer::Renderer definition (remove the comment)
     --------------------------------------------------------------------*/
-
-    Renderer::Renderer() 
+    Renderer::Renderer()
         : m_driverType(D3D_DRIVER_TYPE_NULL)
         , m_featureLevel(D3D_FEATURE_LEVEL_11_0)
         , m_d3dDevice(nullptr)
@@ -25,27 +23,26 @@ namespace library
         , m_swapChain(nullptr)
         , m_swapChain1(nullptr)
         , m_renderTargetView(nullptr)
+        , m_vertexShader(nullptr)
+        , m_pixelShader(nullptr)
+        , m_vertexLayout(nullptr)
+        , m_vertexBuffer(nullptr)
     { }
-
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Initialize
-
       Summary:  Creates Direct3D device and swap chain
-
       Args:     HWND hWnd
                   Handle to the window
-
-      Modifies: [m_d3dDevice, m_featureLevel, m_immediateContext, 
-                  m_d3dDevice1, m_immediateContext1, m_swapChain1, 
-                  m_swapChain, m_renderTargetView].
-
+      Modifies: [m_d3dDevice, m_featureLevel, m_immediateContext,
+                  m_d3dDevice1, m_immediateContext1, m_swapChain1,
+                  m_swapChain, m_renderTargetView, m_vertexShader,
+                  m_vertexLayout, m_pixelShader, m_vertexBuffer].
       Returns:  HRESULT
                   Status code
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
     /*--------------------------------------------------------------------
       TODO: Renderer::Initialize definition (remove the comment)
     --------------------------------------------------------------------*/
-
     HRESULT Renderer::Initialize(_In_ HWND hWnd)
     {
         HRESULT hr = S_OK;
@@ -188,22 +185,211 @@ namespace library
         vp.TopLeftY = 0;
         m_immediateContext->RSSetViewports(1, &vp);
 
+        // Compile Vertex Shader
+        ID3DBlob* pVSBlob = nullptr;
+        hr = compileShaderFromFile(
+            L"../Library/Shaders/Lab03.fxh",
+            "VS",
+            "vs_5_0",
+            &pVSBlob
+        );
+        if (FAILED(hr))
+            return hr;
+
+        // Create Vertex Shader
+        hr = m_d3dDevice->CreateVertexShader(
+            pVSBlob->GetBufferPointer(),
+            pVSBlob->GetBufferSize(),
+            nullptr,
+            &m_vertexShader
+        );
+        if (FAILED(hr))
+            return hr;
+
+        // Compile Pixel Shader
+        ID3DBlob* pPSBlob = nullptr;
+        hr = compileShaderFromFile(
+            L"../Library/Shaders/Lab03.fxh",
+            "PS",
+            "ps_5_0",
+            &pPSBlob
+        );
+        if (FAILED(hr))
+            return hr;
+
+
+        // Create Pixel Shader
+        hr = m_d3dDevice->CreatePixelShader(
+            pPSBlob->GetBufferPointer(),
+            pPSBlob->GetBufferSize(),
+            nullptr,
+            &m_pixelShader
+        );
+        if (FAILED(hr))
+            return hr;
+
+        // Create Vertex Buffer
+        // 1
+        struct SimpleVertex
+        {
+            XMFLOAT3 Position;
+        };
+
+        // 2
+        SimpleVertex aVertices[] =
+        {
+            {XMFLOAT3(0.0f, 0.5f, 0.5f)},
+            {XMFLOAT3(0.5f, -0.5f, 0.5f)},
+            {XMFLOAT3(-0.5f, -0.5f, 0.5f)},
+        };
+
+        // 3
+        D3D11_BUFFER_DESC bd = {};
+        bd.Usage = D3D11_USAGE_DEFAULT;
+        bd.ByteWidth = sizeof(SimpleVertex) * 3;
+        bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+        bd.CPUAccessFlags = 0;
+        bd.MiscFlags = 0;
+
+        // 4
+        D3D11_SUBRESOURCE_DATA initData = {};
+        initData.pSysMem = aVertices;
+        initData.SysMemPitch = 0;
+        initData.SysMemSlicePitch = 0;
+
+        // 5
+        hr = m_d3dDevice->CreateBuffer(
+            &bd,
+            &initData,
+            &m_vertexBuffer
+        );
+        if (FAILED(hr))
+            return hr;
+
+        // Create Input Layout Object
+        D3D11_INPUT_ELEMENT_DESC aLayouts[] =
+        {
+            {   "POSITION",
+                0,
+                DXGI_FORMAT_R32G32B32_FLOAT,
+                0,
+                0,
+                D3D11_INPUT_PER_VERTEX_DATA,
+                0   },
+        };
+        UINT uNumElements = ARRAYSIZE(aLayouts);
+
+        hr = m_d3dDevice->CreateInputLayout(
+            aLayouts,
+            uNumElements,
+            pVSBlob->GetBufferPointer(),
+            pVSBlob->GetBufferSize(),
+            &m_vertexLayout
+        );
+        if (FAILED(hr))
+            return hr;
+
+        // Set Vertex Buffer
+        UINT uStride = sizeof(SimpleVertex);
+        UINT uOffset = 0;
+        m_immediateContext->IASetVertexBuffers(
+            0u,
+            1u,
+            m_vertexBuffer.GetAddressOf(),
+            &uStride,
+            &uOffset
+        );
+
+        // Set Input Layout
+        m_immediateContext->IASetInputLayout(m_vertexLayout.Get());
+
+        // Set Primitive Topology
+        m_immediateContext->IASetPrimitiveTopology(
+            D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+        );
+
         return S_OK;
     }
-
     /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
       Method:   Renderer::Render
-
       Summary:  Render the frame
     M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
     /*--------------------------------------------------------------------
-      TODO: Renderer::Initialize definition (remove the comment)
+      TODO: Renderer::Render definition (remove the comment)
     --------------------------------------------------------------------*/
-
     void Renderer::Render()
     {
-        // Just clear the backbuffer
+        // Clear the backbuffer
         m_immediateContext->ClearRenderTargetView(m_renderTargetView.Get(), Colors::MidnightBlue);
+
+        // Set the Shaders
+        m_immediateContext->VSSetShader(
+            m_vertexShader.Get(),
+            nullptr,
+            0u
+        );
+        m_immediateContext->PSSetShader(
+            m_pixelShader.Get(),
+            nullptr,
+            0u
+        );
+
+        // Draw
+        m_immediateContext->Draw(3, 0u);
+
+        // Present
         m_swapChain->Present(0, 0);
+    }
+    /*M+M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M+++M
+      Method:   Renderer::compileShaderFromFile
+      Summary:  Helper for compiling shaders with D3DCompile
+      Args:     PCWSTR pszFileName
+                  A pointer to a constant null-terminated string that
+                  contains the name of the file that contains the
+                  shader code
+                PCSTR pszEntryPoint
+                  A pointer to a constant null-terminated string that
+                  contains the name of the shader entry point function
+                  where shader execution begins
+                PCSTR pszShaderModel
+                  A pointer to a constant null-terminated string that
+                  specifies the shader target or set of shader
+                  features to compile against
+                ID3DBlob** ppBlobOut
+                  A pointer to a variable that receives a pointer to
+                  the ID3DBlob interface that you can use to access
+                  the compiled code
+      Returns:  HRESULT
+                  Status code
+    M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M---M-M*/
+    /*--------------------------------------------------------------------
+      TODO: Renderer::compileShaderFromFile definition (remove the comment)
+    --------------------------------------------------------------------*/
+    HRESULT Renderer::compileShaderFromFile(_In_ PCWSTR pszFileName, _In_ PCSTR pszEntryPoint, _In_ PCSTR pszShaderModel, _Outptr_ ID3DBlob** ppBlobOut)
+    {
+        HRESULT hr = S_OK;
+
+        DWORD dwShaderFlags = D3DCOMPILE_ENABLE_STRICTNESS;
+
+#if defined(_DEBUG)
+        dwShaderFlags |= D3DCOMPILE_DEBUG;
+        dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
+#endif
+        ComPtr<ID3DBlob> pErrorBlob = nullptr;
+        hr = D3DCompileFromFile(
+            pszFileName,
+            nullptr,
+            nullptr,
+            pszEntryPoint,
+            pszShaderModel,
+            dwShaderFlags,
+            0u,
+            ppBlobOut,
+            pErrorBlob.GetAddressOf()
+        );
+        if (FAILED(hr))
+            return hr;
+
+        return hr;
     }
 }
