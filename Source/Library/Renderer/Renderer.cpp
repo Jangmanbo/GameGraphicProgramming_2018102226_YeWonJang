@@ -186,7 +186,7 @@ namespace library
         m_immediateContext->RSSetViewports(1, &vp);
 
         // Compile Vertex Shader
-        ID3DBlob* pVSBlob = nullptr;
+        ComPtr<ID3DBlob> pVSBlob(nullptr);
         hr = compileShaderFromFile(
             L"../Library/Shaders/Lab03.fxh",
             "VS",
@@ -207,7 +207,7 @@ namespace library
             return hr;
 
         // Compile Pixel Shader
-        ID3DBlob* pPSBlob = nullptr;
+        ComPtr<ID3DBlob> pPSBlob(nullptr);
         hr = compileShaderFromFile(
             L"../Library/Shaders/Lab03.fxh",
             "PS",
@@ -375,7 +375,7 @@ namespace library
         dwShaderFlags |= D3DCOMPILE_DEBUG;
         dwShaderFlags |= D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif
-        ComPtr<ID3DBlob> pErrorBlob = nullptr;
+        ComPtr<ID3DBlob> pErrorBlob(nullptr);
         hr = D3DCompileFromFile(
             pszFileName,
             nullptr,
